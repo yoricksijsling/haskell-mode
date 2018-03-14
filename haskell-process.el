@@ -222,7 +222,9 @@ HPTYPE is the result of calling `'haskell-process-type`' function."
   "Try to send a string to the process's process. Ask to restart if it's not running."
   (let ((child (haskell-process-process process)))
     (if (equal 'run (process-status child))
-        (let ((out (concat string "\n")))
+        (let ((out (if (string-suffix-p "\n" string)
+                       string
+                     (concat string "\n"))))
           (let ((i 0))
             (cl-loop for line in (split-string out "\n")
                      do (unless (string-equal "" line)
