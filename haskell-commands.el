@@ -89,6 +89,7 @@ You can create new session using function `haskell-session-make'."
     (progn (set-process-sentinel (haskell-process-process process) 'haskell-process-sentinel)
            (set-process-filter (haskell-process-process process) 'haskell-process-filter))
     (haskell-process-send-startup process)
+    (haskell-process-send-continuation-prompt-setup process)
     (unless (or (eq 'cabal-repl (haskell-process-type))
                 (eq 'cabal-new-repl (haskell-process-type))
                    (eq 'stack-ghci (haskell-process-type))) ;; Both "cabal repl" and "stack ghci" set the proper CWD.
@@ -109,8 +110,6 @@ You can create new session using function `haskell-session-make'."
     :state process
 
     :go (lambda (process)
-          ;; We must set the prompt last, so that this command as a
-          ;; whole produces only one prompt marker as a response.
           (haskell-process-send-string process
                                        (mapconcat #'identity
                                                   (append '("Prelude.putStrLn \"\""
@@ -119,8 +118,9 @@ You can create new session using function `haskell-session-make'."
                                                             '(":set +c"))) ; :type-at in GHC 8+
                                                   "\n"))
           (haskell-process-send-string process ":set prompt \"\\4\"")
-          (haskell-process-send-string process (format ":set prompt2 \"%s\""
-                                                       haskell-interactive-prompt2)))
+          ;; We must set the prompt last, so that this command as a
+          ;; whole produces only one prompt marker as a response.
+          )
 
     :live (lambda (process buffer)
             (when (haskell-process-consume
@@ -151,6 +151,32 @@ If I break, you can:
   4. Hide these tips:   C-h v haskell-process-show-debug-tips")))
                 (with-current-buffer (haskell-interactive-buffer)
                   (goto-char haskell-interactive-mode-prompt-start))))))
+
+(defun haskell-process-send-continuation-prompt-setup (process)
+  "Figure out if we need to use prompt2 or prompt-cont. Store
+decision under 'prompt-cont-var in haskell PROCESS."
+  (haskell-process-queue-command
+   process
+   (make-haskell-command
+    :state process
+    :go (lambda (process)
+          (haskell-process-send-string process (format ":set prompt-cont \"%s\""
+                                                       haskell-interactive-prompt2)))
+    :complete (lambda (process response)
+                (if (string-empty-p response)
+                    ;; prompt-cont verified to work
+                    (haskell-process-set process 'prompt-cont-var "prompt-cont")
+                  ;; fall back to prompt2 for ghc <= 8.0.x
+                  (haskell-process-set process 'prompt-cont-var "prompt2")
+                  (let ((setstr (haskell-process-prompt-cont-setter
+                                 process
+                                 haskell-interactive-prompt2)))
+                    (haskell-process-queue-without-filters process setstr)))))))
+
+(defun haskell-process-prompt-cont-setter (process str)
+  "Build an expression that sets the continuation prompt"
+  (let ((pcvar (haskell-process-get process 'prompt-cont-var)))
+    (format ":set %s \"%s\"" pcvar str)))
 
 (defun haskell-commands-process ()
   "Get the Haskell session, throws an error if not available."

@@ -247,6 +247,36 @@ is at the prompt."
                                   (point-min))
                              end))))))))
 
+(defun haskell-interactive-mode-new-multi-line (process expr)
+  "If a multi-line expression EXPR has been entered, then reformat it to be:
+
+:{
+do the
+   multi-liner
+   expr
+:}
+
+This function requires PROCESS to determine how to send
+multi-line expressions to ghci.
+"
+  (if (not (string-match-p "\n" expr))
+      expr
+    (let ((pre (format "^%s" (regexp-quote haskell-interactive-prompt)))
+          (lines (split-string expr "\n")))
+      (cl-loop for elt on (cdr lines) do
+               (setcar elt (replace-regexp-in-string pre "" (car elt))))
+      ;; Temporarily set prompt2 to be empty to avoid unwanted output
+      (concat ":set prompt \"\"\n"
+              (haskell-process-prompt-cont-setter process "") "\n"
+              ":{\n"
+              (mapconcat #'identity lines "\n")
+              "\n:}\n"
+              (haskell-process-prompt-cont-setter process haskell-interactive-prompt2) "\n"
+              ":set prompt \"\\4\"\n"))))
+
+(make-obsolete 'haskell-interactive-mode-multi-line
+               'haskell-interactive-mode-new-multi-line
+               "GHC 8.1.0")
 (defun haskell-interactive-mode-multi-line (expr)
   "If a multi-line expression EXPR has been entered, then reformat it to be:
 

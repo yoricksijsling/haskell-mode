@@ -80,7 +80,10 @@
             (setq haskell-interactive-mode-result-end
                   (point-max))
             (haskell-process-send-string (cadr state)
-                                         (haskell-interactive-mode-multi-line (cl-caddr state)))
+                                         (haskell-interactive-mode-new-multi-line
+                                          (cadr state)
+                                          (cl-caddr state)))
+
             (haskell-process-set-evaluating (cadr state) t))
       :live (lambda (state buffer)
               (unless (and (string-prefix-p ":q" (cl-caddr state))
