@@ -113,7 +113,8 @@ You can create new session using function `haskell-session-make'."
           (haskell-process-send-string process
                                        (mapconcat #'identity
                                                   (append '("Prelude.putStrLn \"\""
-                                                            ":set -v1")
+                                                            ":set -v1"
+                                                            ":set -fshow-loaded-modules")
                                                           (when haskell-interactive-set-+c
                                                             '(":set +c"))) ; :type-at in GHC 8+
                                                   "\n"))
