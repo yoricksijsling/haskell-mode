@@ -370,25 +370,24 @@ If PROMPT-VALUE is non-nil, request identifier via mini-buffer."
 Given INSERT-VALUE prefix indicates that result type signature
 should be inserted."
   (interactive "P")
-  (if insert-value
-      (haskell-process-insert-type)
-    (let* ((expr
-            (if (use-region-p)
-                (buffer-substring-no-properties (region-beginning) (region-end))
-              (haskell-ident-at-point)))
-           (expr-okay (and expr
+  (let* ((expr
+          (if (use-region-p)
+              (buffer-substring-no-properties (region-beginning) (region-end))
+            (haskell-ident-at-point)))
+         (expr-okay (and expr
                          (not (string-match-p "\\`[[:space:]]*\\'" expr))
                          (not (string-match-p "\n" expr)))))
-      ;; No newlines in expressions, and surround with parens if it
-      ;; might be a slice expression
-      (when expr-okay
-        (haskell-process-show-repl-response
-         (format
-          (if (or (string-match-p "\\`(" expr)
-                  (string-match-p "\\`[_[:alpha:]]" expr))
-              ":type %s"
-            ":type (%s)")
-          expr))))))
+    ;; No newlines in expressions, and surround with parens if it
+    ;; might be a slice expression
+    (when expr-okay
+      (let ((command (format (if (or (string-match-p "\\`(" expr)
+                                     (string-match-p "\\`[_[:alpha:]]" expr))
+                                 ":type %s"
+                               ":type (%s)")
+                             expr)))
+        (if insert-value
+            (haskell-process-insert-repl-response command)
+          (haskell-process-show-repl-response command))))))
 
 ;;;###autoload
 (defun haskell-mode-jump-to-def-or-tag (&optional _next-p)
@@ -430,33 +429,26 @@ Requires the :loc-at command from GHCi."
   (forward-line (1- (plist-get span :start-line)))
   (forward-char (plist-get span :start-col)))
 
-(defun haskell-process-insert-type ()
-  "Get the identifier at the point and insert its type.
-Use GHCi's :type if it's possible."
-  (let ((ident (haskell-ident-at-point)))
-    (when ident
-      (let ((process (haskell-interactive-process))
-            (query (format (if (string-match "^[_[:lower:][:upper:]]" ident)
-                               ":type %s"
-                             ":type (%s)")
-                           ident)))
-        (haskell-process-queue-command
-         process
-         (make-haskell-command
-          :state (list process query (current-buffer))
-          :go (lambda (state)
-                (haskell-process-send-string (nth 0 state)
-                                             (nth 1 state)))
-          :complete (lambda (state response)
-                      (cond
-                       ;; TODO: Generalize this into a function.
-                       ((or (string-match "^Top level" response)
-                            (string-match "^<interactive>" response))
-                        (message "%s" response))
-                       (t
-                        (with-current-buffer (nth 2 state)
-                          (goto-char (line-beginning-position))
-                          (insert (format "%s\n" (replace-regexp-in-string "\n$" "" response)))))))))))))
+(defun haskell-process-insert-repl-response (command)
+  "Run the command and insert the response before the current line."
+  (let ((process (haskell-interactive-process)))
+    (haskell-process-queue-command
+     process
+     (make-haskell-command
+      :state (list process command (current-buffer))
+      :go (lambda (state)
+            (haskell-process-send-string (nth 0 state)
+                                         (nth 1 state)))
+      :complete (lambda (state response)
+                  (cond
+                   ;; TODO: Generalize this into a function.
+                   ((or (string-match "^Top level" response)
+                        (string-match "^<interactive>" response))
+                    (message "%s" response))
+                   (t
+                    (with-current-buffer (nth 2 state)
+                      (goto-char (line-beginning-position))
+                      (insert (format "%s\n" (replace-regexp-in-string "\n$" "" response)))))))))))
 
 (defun haskell-mode-find-def (ident)
   ;; TODO Check if it possible to exploit `haskell-process-do-info'
