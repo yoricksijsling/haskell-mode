@@ -123,11 +123,11 @@ actual Emacs buffer of the module being loaded."
                nil)
               ((haskell-process-consume
                 process
-                "Ok, modules loaded: \\(.+\\)\\.$")
+                "Ok, modules loaded: \\(.+?\\)\\.$")
                t)
               ((haskell-process-consume
                 process
-                "Failed, modules loaded: \\(.+\\)\\.$")
+                "Failed, modules loaded: \\(.+?\\)\\.$")
                nil)
 	      ((haskell-process-consume
                 process
